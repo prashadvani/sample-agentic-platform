@@ -123,32 +123,91 @@ See [labs/README.md](labs/README.md) for detailed instructions.
 
 ### Local Development Quickstart
 
-Prerequisites: [Python 3.12](https://www.python.org/), [uv](https://github.com/astral-sh/uv), [Docker](https://docs.docker.com/engine/install/)
+**Prerequisites:**
+
+- [Python 3.12.8](https://www.python.org/) — the exact version is pinned in `pyproject.toml` (`requires-python = "==3.12.8"`). `uv` will install it for you (see below).
+- [uv](https://github.com/astral-sh/uv) — package manager. This project uses a `uv` workspace (`labs-common` is a workspace member), so `pip` will not work; use `uv`.
+- [Docker](https://docs.docker.com/engine/install/) — must be **running** before `make dev:deps`.
+- **AWS credentials with Amazon Bedrock access** in your target region (default `us-west-2`). The LiteLLM gateway calls Bedrock using the credentials in your `~/.aws` directory, which is mounted into the gateway container. You must have **enabled model access** for the models you intend to call (see step 4 and the troubleshooting note below) — a brand-new account has not, and calls will fail with `AccessDenied` until you do.
 
 ```bash
-# Clone and install
+# 1. Clone
 git clone https://github.com/aws-samples/sample-agentic-platform.git
 cd sample-agentic-platform
-uv sync
 
-# Start supporting services (Postgres, Redis, LiteLLM, Memory Gateway)
+# 2. Install the pinned Python and all dependencies (creates .venv)
+uv python pin 3.12.8   # downloads CPython 3.12.8 if you don't have it
+uv sync                # installs deps, including the labs-common workspace package
+
+# 3. Create the local environment file (REQUIRED — `make dev:deps` fails without it)
+cp .env.example .env   # then edit .env and fill in the values below
+
+# 4. Make sure your AWS credentials are available and Bedrock model access is enabled
+#    (the gateway reads ~/.aws; SSO users must have a valid session, e.g. `aws sso login`)
+
+# 5. Start supporting services (Postgres, Redis, LiteLLM, Memory Gateway). Needs Docker running.
 make dev:deps
 
-# Run an agent
+# 6. Run an agent (this BLOCKS — it's a --reload server; leave it running in this terminal)
 make dev agentic_chat
-
-# Run an MCP server
-make dev:mcp bedrock_kb_mcp_server
+#    -> INFO:  Uvicorn running on http://127.0.0.1:8080
 
 # Stop supporting services when done
 make dev:deps-stop
 ```
 
-Run `make help` to see all available commands.
+**Required `.env` values** (local dev; see `.env.example` for the full list):
+
+| Variable | Purpose | Local value |
+|----------|---------|-------------|
+| `ENVIRONMENT` | Selects local connection paths | `local` |
+| `AWS_DEFAULT_REGION` | Bedrock region | e.g. `us-west-2` |
+| `PG_*` | Postgres connection | match `docker-compose.yaml` (`dev`/`dev`/`devdb`) |
+| `LITELLM_MASTER_KEY` | Protects the LiteLLM proxy; also the key clients send | any string, e.g. `sk-local-dev-1234` |
+| `LITELLM_DATABASE_URL` | LiteLLM's metadata DB | `postgresql://dev:dev@postgres:5432/devdb` |
+
+**Test the running agent** (from a **second** terminal — the agent occupies the first):
+
+```bash
+curl -X POST http://localhost:8080/api/agentic-chat/invocations \
+  -H "Content-Type: application/json" \
+  -d '{"message":{"role":"user","content":[{"type":"text","text":"hello"}]},"session_id":"test"}'
+```
+
+The request body is a single `AgenticRequest`: one `message` object whose `content` is a list of typed blocks (not a `messages` array and not a bare string).
+
+**Run an MCP server instead:**
+
+```bash
+make dev:mcp bedrock_kb_mcp_server
+```
+
+Run `make help` to see all available commands and the list of available agents.
+
+### Troubleshooting local dev
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `env file ... /.env not found` on `make dev:deps` | No root `.env` | `cp .env.example .env` and fill it in (step 3) |
+| `make: *** No rule to make target 'dev'` | Running `make` outside the repo root | `cd` into the cloned repo first |
+| Agent returns `Internal Server Error` (500) | LiteLLM can't reach Bedrock | Check `docker compose logs litellm`. Usually missing/expired AWS credentials or Bedrock model access not enabled. |
+| litellm log: `'NoneType' object has no attribute 'access_key'` | No AWS credentials visible to the gateway | Ensure `~/.aws` has valid credentials; SSO users run `aws sso login` and recreate: `docker compose up -d --force-recreate litellm` |
+| Bedrock error: model marked **Legacy** / `AccessDenied` | The requested model is dormant or not enabled in your account | Enable model access in the Bedrock console, or use an active model (Claude Sonnet 4.5, Haiku 4.5, Nova). Model IDs live in `src/agentic_platform/core/models/model_config.py`. |
 
 ### Deploying to AWS
 
 See [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### Teardown
+
+**Local:** stop the supporting containers when you're done. Add `-v` to also delete the Postgres/Redis volumes if you want a clean slate.
+
+```bash
+make dev:deps-stop        # stop containers (data volumes preserved)
+docker compose down -v    # optional: also remove postgres_data / redis_data volumes
+```
+
+**AWS:** destroy the deployed stacks to avoid ongoing charges (orphaned EKS/Aurora/NAT resources cost money). Full teardown order and commands are in [DEPLOYMENT.md → Teardown](DEPLOYMENT.md#teardown) — in short, `terraform destroy` each stack in reverse order (agents/runtime first, Foundation last).
 
 ## Security
 
