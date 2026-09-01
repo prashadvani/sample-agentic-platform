@@ -223,3 +223,6 @@ cdk/lambda/**/*.js
 cdk/lambda/**/*.d.ts
 cdk/test/**/*.js
 cdk/test/**/*.d.ts
+
+# Local resolved AWS temp credentials (never commit)
+.env.aws-creds
