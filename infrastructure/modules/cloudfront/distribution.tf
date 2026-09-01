@@ -19,10 +19,13 @@ resource "aws_cloudfront_distribution" "spa_website" {
     origin_access_control_id = aws_cloudfront_origin_access_control.spa_website.id
     origin_id                = "S3-${var.s3_bucket_name}"
 
-    # Add origin shield for better performance and cost optimization
+    # Add origin shield for better performance and cost optimization.
+    # Origin Shield should sit in the same region as the origin, so default to
+    # the deploy-time region rather than a frozen value. Allow an explicit
+    # override for cases where the origin lives in a different region.
     origin_shield {
       enabled              = true
-      origin_shield_region = "us-west-2"
+      origin_shield_region = var.origin_shield_region != "" ? var.origin_shield_region : data.aws_region.current.name
     }
   }
 
