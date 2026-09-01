@@ -7,9 +7,9 @@
 
 # Direct Bedrock API calls (BedrockModel, bedrock-runtime converse)
 HAIKU_MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-SONNET_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+SONNET_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 NOVA_LITE_MODEL_ID = "us.amazon.nova-lite-v1:0"
 
 # LiteLLM proxy model names (must match model_name entries in litellm_config.yaml)
 HAIKU_LITELLM_MODEL_ID = "anthropic.claude-haiku-4-5-20251001-v1:0"
-SONNET_LITELLM_MODEL_ID = "anthropic.claude-sonnet-4-20250514-v1:0"
+SONNET_LITELLM_MODEL_ID = "anthropic.claude-sonnet-4-5-20250929-v1:0"
