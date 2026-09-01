@@ -40,3 +40,9 @@ variable "vpc_origin_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "origin_shield_region" {
+  description = "AWS region for CloudFront Origin Shield. Leave empty to use the deploy-time region (recommended when the origin is in the same region). Set explicitly only if the origin lives in a different region."
+  type        = string
+  default     = ""
+}
